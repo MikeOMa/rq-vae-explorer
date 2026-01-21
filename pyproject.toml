@@ -1,0 +1,32 @@
+[project]
+name = "rq-vae-explorer"
+version = "0.1.0"
+description = "Interactive RQ-VAE training visualization tool"
+requires-python = ">=3.11"
+dependencies = [
+    "jax[cpu]",
+    "flax",
+    "optax",
+    "tensorflow-datasets",
+    "gradio",
+    "matplotlib",
+    "numpy",
+]
+
+[project.optional-dependencies]
+gpu = ["jax[cuda12]"]
+dev = ["pytest", "pytest-cov"]
+
+[project.scripts]
+rq-vae-explorer = "rq_vae_explorer.ui.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rq_vae_explorer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
