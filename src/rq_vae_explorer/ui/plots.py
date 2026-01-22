@@ -15,98 +15,239 @@ def plot_codebook_2d(
     labels: np.ndarray | None = None,
     assignment_counts: np.ndarray | None = None,
     threshold_pct: float = 0.01,
+    z_q1: np.ndarray | None = None,
+    z_q: np.ndarray | None = None,
+    mode: str = "Residuals",
 ) -> plt.Figure:
     """Plot codebook vectors and encoder outputs in 2D.
 
     Args:
         codebook: Codebook vectors (num_levels, num_codes, 2)
-        encoder_outputs: Encoder outputs to scatter (num_samples, 2)
+        encoder_outputs: Encoder outputs z_e (num_samples, 2)
         labels: Labels for encoder outputs (num_samples,)
         assignment_counts: Assignment counts (num_levels, num_codes)
         threshold_pct: Threshold for dead codebook detection
+        z_q1: Level 1 quantized outputs (num_samples, 2)
+        z_q: Final quantized outputs (num_samples, 2)
+        mode: "Residuals" or "Cumulative" for plot 2
 
     Returns:
         Matplotlib figure
     """
-    num_levels = codebook.shape[0]
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
-    fig, axes = plt.subplots(1, num_levels, figsize=(5 * num_levels, 5))
-    if num_levels == 1:
-        axes = [axes]
+    # --- Plot 1: Level 1 (always the same) ---
+    ax1 = axes[0]
+    level_codebook = codebook[0]  # (num_codes, 2)
 
-    for level, ax in enumerate(axes):
-        level_codebook = codebook[level]  # (num_codes, 2)
+    # Determine dead codebooks for level 1
+    if assignment_counts is not None:
+        total_assignments = assignment_counts[0].sum()
+        threshold = threshold_pct * total_assignments
+        is_dead = assignment_counts[0] < threshold
+    else:
+        is_dead = np.zeros(len(level_codebook), dtype=bool)
 
-        # Determine dead codebooks
-        if assignment_counts is not None:
-            total_assignments = assignment_counts[level].sum()
-            threshold = threshold_pct * total_assignments
-            is_dead = assignment_counts[level] < threshold
-        else:
-            is_dead = np.zeros(len(level_codebook), dtype=bool)
+    # Plot encoder outputs on plot 1
+    if encoder_outputs is not None:
+        _scatter_points(ax1, encoder_outputs, labels, marker="o")
 
-        # Plot encoder outputs
-        if encoder_outputs is not None:
-            if labels is not None:
-                for digit in range(10):
-                    mask = labels == digit
-                    if mask.any():
-                        ax.scatter(
-                            encoder_outputs[mask, 0],
-                            encoder_outputs[mask, 1],
-                            c=DIGIT_COLORS[digit],
-                            alpha=0.3,
-                            s=10,
-                            label=str(digit),
-                        )
-            else:
-                ax.scatter(
-                    encoder_outputs[:, 0],
-                    encoder_outputs[:, 1],
-                    alpha=0.3,
-                    s=10,
-                    c="gray",
-                )
+    # Plot level 1 codebook vectors
+    _plot_codebook_centers(ax1, level_codebook, is_dead)
 
-        # Plot codebook vectors
-        active_mask = ~is_dead
-        dead_mask = is_dead
+    ax1.set_title("Level 1")
+    ax1.set_xlabel("Latent dim 1")
+    ax1.set_ylabel("Latent dim 2")
+    ax1.grid(True, alpha=0.3)
 
-        # Active codebooks (filled circles)
-        if active_mask.any():
-            ax.scatter(
-                level_codebook[active_mask, 0],
-                level_codebook[active_mask, 1],
-                c="black",
-                s=100,
-                marker="o",
-                edgecolors="white",
-                linewidths=2,
-                zorder=10,
-                label="Active",
-            )
+    # --- Plot 2: Mode-dependent ---
+    ax2 = axes[1]
 
-        # Dead codebooks (hollow circles)
-        if dead_mask.any():
-            ax.scatter(
-                level_codebook[dead_mask, 0],
-                level_codebook[dead_mask, 1],
-                c="white",
-                s=100,
-                marker="o",
-                edgecolors="gray",
-                linewidths=2,
-                zorder=10,
-                label="Dead",
-            )
-
-        ax.set_title(f"Level {level + 1}")
-        ax.set_xlabel("Latent dim 1")
-        ax.set_ylabel("Latent dim 2")
-        ax.grid(True, alpha=0.3)
+    if mode == "Cumulative":
+        _plot_cumulative(
+            ax2,
+            codebook[0],
+            encoder_outputs,
+            z_q,
+            labels,
+            assignment_counts,
+            threshold_pct,
+        )
+    else:  # Residuals
+        _plot_residuals(
+            ax2,
+            codebook,
+            encoder_outputs,
+            z_q1,
+            labels,
+            assignment_counts,
+            threshold_pct,
+        )
 
     plt.tight_layout()
     return fig
+
+
+def _scatter_points(
+    ax: plt.Axes,
+    points: np.ndarray,
+    labels: np.ndarray | None,
+    marker: str = "o",
+    alpha: float = 0.3,
+    size: int = 10,
+) -> None:
+    """Scatter points colored by label."""
+    if labels is not None:
+        for digit in range(10):
+            mask = labels == digit
+            if mask.any():
+                ax.scatter(
+                    points[mask, 0],
+                    points[mask, 1],
+                    c=DIGIT_COLORS[digit],
+                    alpha=alpha,
+                    s=size,
+                    marker=marker,
+                    label=str(digit) if marker == "o" else None,
+                )
+    else:
+        ax.scatter(
+            points[:, 0],
+            points[:, 1],
+            alpha=alpha,
+            s=size,
+            c="gray",
+            marker=marker,
+        )
+
+
+def _plot_codebook_centers(
+    ax: plt.Axes,
+    codebook: np.ndarray,
+    is_dead: np.ndarray,
+) -> None:
+    """Plot codebook centers (active filled, dead hollow)."""
+    active_mask = ~is_dead
+    dead_mask = is_dead
+
+    if active_mask.any():
+        ax.scatter(
+            codebook[active_mask, 0],
+            codebook[active_mask, 1],
+            c="black",
+            s=100,
+            marker="o",
+            edgecolors="white",
+            linewidths=2,
+            zorder=10,
+            label="Active",
+        )
+
+    if dead_mask.any():
+        ax.scatter(
+            codebook[dead_mask, 0],
+            codebook[dead_mask, 1],
+            c="white",
+            s=100,
+            marker="o",
+            edgecolors="gray",
+            linewidths=2,
+            zorder=10,
+            label="Dead",
+        )
+
+
+def _plot_residuals(
+    ax: plt.Axes,
+    codebook: np.ndarray,
+    encoder_outputs: np.ndarray | None,
+    z_q1: np.ndarray | None,
+    labels: np.ndarray | None,
+    assignment_counts: np.ndarray | None,
+    threshold_pct: float,
+) -> None:
+    """Plot level 2 with residuals (z_e - z_q1)."""
+    level_codebook = codebook[1] if codebook.shape[0] > 1 else codebook[0]
+
+    # Determine dead codebooks for level 2
+    if assignment_counts is not None and assignment_counts.shape[0] > 1:
+        total_assignments = assignment_counts[1].sum()
+        threshold = threshold_pct * total_assignments
+        is_dead = assignment_counts[1] < threshold
+    else:
+        is_dead = np.zeros(len(level_codebook), dtype=bool)
+
+    # Plot residuals
+    if encoder_outputs is not None and z_q1 is not None:
+        residuals = encoder_outputs - z_q1
+        _scatter_points(ax, residuals, labels, marker="o")
+
+    # Plot level 2 codebook
+    _plot_codebook_centers(ax, level_codebook, is_dead)
+
+    ax.set_title("Level 2 (Residuals)")
+    ax.set_xlabel("Residual dim 1")
+    ax.set_ylabel("Residual dim 2")
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_cumulative(
+    ax: plt.Axes,
+    level1_codebook: np.ndarray,
+    encoder_outputs: np.ndarray | None,
+    z_q: np.ndarray | None,
+    labels: np.ndarray | None,
+    assignment_counts: np.ndarray | None,
+    threshold_pct: float,
+) -> None:
+    """Plot cumulative view: z_e, z_q, and connecting lines."""
+    # Determine dead codebooks for level 1 (shown in cumulative view)
+    if assignment_counts is not None:
+        total_assignments = assignment_counts[0].sum()
+        threshold = threshold_pct * total_assignments
+        is_dead = assignment_counts[0] < threshold
+    else:
+        is_dead = np.zeros(len(level1_codebook), dtype=bool)
+
+    # Plot encoder outputs (circles)
+    if encoder_outputs is not None:
+        _scatter_points(ax, encoder_outputs, labels, marker="o", alpha=0.4)
+
+    # Plot final quantized (x markers) and connecting lines
+    if encoder_outputs is not None and z_q is not None:
+        # Draw connecting lines
+        if labels is not None:
+            for digit in range(10):
+                mask = labels == digit
+                if mask.any():
+                    for i in np.where(mask)[0]:
+                        ax.plot(
+                            [encoder_outputs[i, 0], z_q[i, 0]],
+                            [encoder_outputs[i, 1], z_q[i, 1]],
+                            c=DIGIT_COLORS[digit],
+                            alpha=0.2,
+                            linewidth=0.5,
+                        )
+        else:
+            for i in range(len(encoder_outputs)):
+                ax.plot(
+                    [encoder_outputs[i, 0], z_q[i, 0]],
+                    [encoder_outputs[i, 1], z_q[i, 1]],
+                    c="gray",
+                    alpha=0.2,
+                    linewidth=0.5,
+                )
+
+        # Plot z_q points (x markers)
+        _scatter_points(ax, z_q, labels, marker="x", alpha=0.6, size=20)
+
+    # Plot level 1 codebook
+    _plot_codebook_centers(ax, level1_codebook, is_dead)
+
+    ax.set_title("Cumulative Quantization")
+    ax.set_xlabel("Latent dim 1")
+    ax.set_ylabel("Latent dim 2")
+    ax.grid(True, alpha=0.3)
 
 
 def plot_loss_curves(history: dict[str, list[float]]) -> plt.Figure:
