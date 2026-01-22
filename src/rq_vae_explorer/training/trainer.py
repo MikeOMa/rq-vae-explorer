@@ -78,7 +78,9 @@ class Trainer:
         batch: jnp.ndarray,
         lambda_commit: float,
         lambda_codebook: float,
-    ) -> tuple[Any, Any, dict, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    ) -> tuple[
+        Any, Any, dict, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray
+    ]:
         """Inner training step (JIT compiled)."""
 
         def loss_fn(params):
@@ -100,7 +102,16 @@ class Trainer:
         updates, opt_state = self.optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
 
-        return params, opt_state, losses, aux["codebook"], aux["indices"], aux["z_e"]
+        return (
+            params,
+            opt_state,
+            losses,
+            aux["codebook"],
+            aux["indices"],
+            aux["z_e"],
+            aux["z_q1"],
+            aux["z_q"],
+        )
 
     def train_step(self) -> None:
         """Execute a single training step."""
@@ -114,6 +125,8 @@ class Trainer:
             codebook,
             indices,
             encoder_outputs,
+            z_q1,
+            z_q,
         ) = self._train_step_jit(
             self.params,
             self.opt_state,
@@ -127,6 +140,8 @@ class Trainer:
         encoder_outputs_np = np.array(encoder_outputs)
         labels_np = np.array(batch_labels)
         indices_np = np.array(indices)
+        z_q1_np = np.array(z_q1)
+        z_q_np = np.array(z_q)
 
         # Update assignment tracking
         self._update_assignment_tracking(indices_np)
@@ -139,6 +154,8 @@ class Trainer:
             encoder_outputs=encoder_outputs_np,
             encoder_labels=labels_np,
             assignment_counts=self._get_assignment_counts(),
+            z_q1=z_q1_np,
+            z_q=z_q_np,
         )
         self.state.add_losses({k: float(v) for k, v in losses.items()})
 
