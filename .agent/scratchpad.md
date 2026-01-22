@@ -13,7 +13,7 @@ Current Phase: Batch 2 - Full Model and Training
 - [x] Task 5: Residual Quantizer Module
 - [x] Task 6: Full RQ-VAE Model
 - [x] Task 7: Loss Functions
-- [ ] Task 8: Training State
+- [x] Task 8: Training State
 - [ ] Task 9: Trainer
 - [ ] Task 10: Plotting Functions
 - [ ] Task 11: UI Controls
