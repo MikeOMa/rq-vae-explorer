@@ -1,3 +1,8 @@
 """RQ-VAE model components."""
 
-# Imports will be added as modules are created
+from .encoder import Encoder
+from .decoder import Decoder
+from .quantizer import ResidualQuantizer
+from .rqvae import RQVAE
+
+__all__ = ["Encoder", "Decoder", "ResidualQuantizer", "RQVAE"]
