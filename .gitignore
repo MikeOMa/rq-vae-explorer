@@ -12,3 +12,5 @@ venv/
 .env
 *.log
 .DS_Store
+.ralph/
+.agent/
