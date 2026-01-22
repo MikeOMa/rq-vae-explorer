@@ -47,10 +47,13 @@ class ResidualQuantizer(nn.Module):
                     - indices: Selected codebook indices (batch, num_levels)
                     - codebook: Current codebook values
                     - z_e: Original encoder output (for loss computation)
+                    - z_q: Final quantized output
+                    - z_q1: Level 1 quantized output
         """
         quantized = jnp.zeros_like(z)
         residual = z
         all_indices = []
+        z_q1 = None  # Store level 1 result
 
         for level in range(self.num_levels):
             level_codebook = self.codebook[level]  # (num_codes, latent_dim)
@@ -70,6 +73,10 @@ class ResidualQuantizer(nn.Module):
             # Accumulate quantized output
             quantized = quantized + level_quantized
 
+            # Capture level 1 result
+            if level == 0:
+                z_q1 = quantized
+
             # Compute residual for next level
             residual = residual - level_quantized
 
@@ -83,6 +90,7 @@ class ResidualQuantizer(nn.Module):
             "codebook": self.codebook,
             "z_e": z,
             "z_q": quantized,
+            "z_q1": z_q1,
         }
 
         return quantized_st, aux
