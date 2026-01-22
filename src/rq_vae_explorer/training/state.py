@@ -34,6 +34,8 @@ class TrainingState:
 
     # Assignment tracking for dead codebook detection
     _assignment_counts: np.ndarray | None = None
+    _z_q1: np.ndarray | None = None
+    _z_q: np.ndarray | None = None
 
     # Thread lock
     _lock: threading.Lock = field(default_factory=threading.Lock)
@@ -111,6 +113,8 @@ class TrainingState:
             self._reconstructions = None
             self._sample_inputs = None
             self._assignment_counts = None
+            self._z_q1 = None
+            self._z_q = None
 
     # --- Metrics updates ---
 
@@ -123,6 +127,8 @@ class TrainingState:
         reconstructions: np.ndarray | None = None,
         sample_inputs: np.ndarray | None = None,
         assignment_counts: np.ndarray | None = None,
+        z_q1: np.ndarray | None = None,
+        z_q: np.ndarray | None = None,
     ) -> None:
         """Update state with new values from trainer."""
         with self._lock:
@@ -140,6 +146,10 @@ class TrainingState:
                 self._sample_inputs = sample_inputs
             if assignment_counts is not None:
                 self._assignment_counts = assignment_counts
+            if z_q1 is not None:
+                self._z_q1 = z_q1
+            if z_q is not None:
+                self._z_q = z_q
 
     def add_losses(self, losses: dict[str, float]) -> None:
         """Add a new loss record to history."""
@@ -191,3 +201,10 @@ class TrainingState:
                 if self._assignment_counts is not None
                 else None
             )
+
+    def get_quantized_outputs(self) -> tuple[np.ndarray | None, np.ndarray | None]:
+        """Get z_q1 and z_q arrays."""
+        with self._lock:
+            z_q1 = self._z_q1.copy() if self._z_q1 is not None else None
+            z_q = self._z_q.copy() if self._z_q is not None else None
+            return z_q1, z_q
