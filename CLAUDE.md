@@ -19,3 +19,26 @@ To run an agentic task:
 ```bash
 ralph run
 ```
+
+## Commands
+
+```bash
+# Install dependencies
+uv sync
+
+# Run the app
+uv run rq-vae-explorer
+
+# Run tests
+uv run pytest tests/ -v
+
+# Run single test
+uv run pytest tests/test_file.py::test_name -v
+```
+
+## Architecture
+
+- `src/rq_vae_explorer/model/` - Flax-based RQ-VAE (encoder, decoder, quantizer)
+- `src/rq_vae_explorer/training/` - Training loop, losses, thread-safe state
+- `src/rq_vae_explorer/data/` - MNIST data loading
+- `src/rq_vae_explorer/ui/` - Gradio application and plotting
