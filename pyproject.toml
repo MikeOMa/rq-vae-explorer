@@ -8,6 +8,7 @@ dependencies = [
     "flax",
     "optax",
     "tensorflow-datasets",
+    "tensorflow",
     "gradio",
     "matplotlib",
     "numpy",

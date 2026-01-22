@@ -1,3 +1,5 @@
 """Data loading utilities."""
 
-# Imports will be added as modules are created
+from .mnist import load_mnist, create_data_iterator
+
+__all__ = ["load_mnist", "create_data_iterator"]
