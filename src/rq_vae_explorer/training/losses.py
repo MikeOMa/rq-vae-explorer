@@ -39,7 +39,9 @@ def compute_losses(
     codebook_loss = jnp.mean((jax.lax.stop_gradient(z_e) - z_q) ** 2)
 
     # Total loss
-    total_loss = recon_loss + lambda_commit * commit_loss + lambda_codebook * codebook_loss
+    total_loss = (
+        recon_loss + lambda_commit * commit_loss + lambda_codebook * codebook_loss
+    )
 
     return {
         "total": total_loss,

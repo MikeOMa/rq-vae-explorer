@@ -2,7 +2,6 @@
 
 import threading
 from dataclasses import dataclass, field
-from typing import Any
 import numpy as np
 
 
@@ -13,6 +12,7 @@ class TrainingState:
     The trainer reads lambda values and writes metrics.
     The UI reads metrics and writes lambda values.
     """
+
     # Loss weights (UI writes, trainer reads)
     _lambda_commit: float = 0.25
     _lambda_codebook: float = 1.0
@@ -23,9 +23,9 @@ class TrainingState:
     _should_stop: bool = False
 
     # Metrics (trainer writes, UI reads)
-    _loss_history: dict[str, list[float]] = field(default_factory=lambda: {
-        "total": [], "recon": [], "commit": [], "codebook": []
-    })
+    _loss_history: dict[str, list[float]] = field(
+        default_factory=lambda: {"total": [], "recon": [], "commit": [], "codebook": []}
+    )
     _codebook: np.ndarray | None = None
     _encoder_outputs: np.ndarray | None = None
     _encoder_labels: np.ndarray | None = None
@@ -99,7 +99,12 @@ class TrainingState:
             self._step = 0
             self._is_training = False
             self._should_stop = False
-            self._loss_history = {"total": [], "recon": [], "commit": [], "codebook": []}
+            self._loss_history = {
+                "total": [],
+                "recon": [],
+                "commit": [],
+                "codebook": [],
+            }
             self._codebook = None
             self._encoder_outputs = None
             self._encoder_labels = None
@@ -155,16 +160,34 @@ class TrainingState:
 
     def get_encoder_outputs(self) -> tuple[np.ndarray | None, np.ndarray | None]:
         with self._lock:
-            outputs = self._encoder_outputs.copy() if self._encoder_outputs is not None else None
-            labels = self._encoder_labels.copy() if self._encoder_labels is not None else None
+            outputs = (
+                self._encoder_outputs.copy()
+                if self._encoder_outputs is not None
+                else None
+            )
+            labels = (
+                self._encoder_labels.copy()
+                if self._encoder_labels is not None
+                else None
+            )
             return outputs, labels
 
     def get_reconstructions(self) -> tuple[np.ndarray | None, np.ndarray | None]:
         with self._lock:
-            recons = self._reconstructions.copy() if self._reconstructions is not None else None
-            inputs = self._sample_inputs.copy() if self._sample_inputs is not None else None
+            recons = (
+                self._reconstructions.copy()
+                if self._reconstructions is not None
+                else None
+            )
+            inputs = (
+                self._sample_inputs.copy() if self._sample_inputs is not None else None
+            )
             return recons, inputs
 
     def get_assignment_counts(self) -> np.ndarray | None:
         with self._lock:
-            return self._assignment_counts.copy() if self._assignment_counts is not None else None
+            return (
+                self._assignment_counts.copy()
+                if self._assignment_counts is not None
+                else None
+            )

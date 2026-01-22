@@ -15,6 +15,7 @@ class Decoder(nn.Module):
     Attributes:
         latent_dim: Dimension of the input latent vector (default 2)
     """
+
     latent_dim: int = 2
 
     @nn.compact

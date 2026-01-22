@@ -1,6 +1,4 @@
-import jax
 import time
-import threading
 from rq_vae_explorer.training.trainer import Trainer
 from rq_vae_explorer.training.state import TrainingState
 

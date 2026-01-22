@@ -1,6 +1,5 @@
 """Integration tests for the full application."""
 
-import time
 from rq_vae_explorer.training.state import TrainingState
 from rq_vae_explorer.training.trainer import Trainer
 

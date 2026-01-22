@@ -18,6 +18,7 @@ class RQVAE(nn.Module):
         num_codes: Number of codebook vectors per level
         num_levels: Number of residual quantization levels
     """
+
     latent_dim: int = 2
     num_codes: int = 16
     num_levels: int = 2

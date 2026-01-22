@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 from rq_vae_explorer.ui.plots import (
     plot_codebook_2d,
     plot_loss_curves,
-    plot_reconstructions,
     get_codebook_health,
 )
 
@@ -36,10 +35,46 @@ def test_plot_loss_curves_returns_figure():
 
 def test_get_codebook_health():
     # 2 levels, 16 codes each
-    assignment_counts = np.array([
-        [10, 10, 10, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],  # Level 0: 2 dead
-        [10, 10, 10, 10, 10, 10, 10, 10, 0, 0, 0, 0, 10, 10, 10, 10],  # Level 1: 4 dead
-    ])
+    assignment_counts = np.array(
+        [
+            [
+                10,
+                10,
+                10,
+                0,
+                0,
+                10,
+                10,
+                10,
+                10,
+                10,
+                10,
+                10,
+                10,
+                10,
+                10,
+                10,
+            ],  # Level 0: 2 dead
+            [
+                10,
+                10,
+                10,
+                10,
+                10,
+                10,
+                10,
+                10,
+                0,
+                0,
+                0,
+                0,
+                10,
+                10,
+                10,
+                10,
+            ],  # Level 1: 4 dead
+        ]
+    )
 
     health = get_codebook_health(assignment_counts, threshold_pct=0.01)
 

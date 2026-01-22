@@ -2,6 +2,7 @@
 
 import gradio as gr
 import matplotlib
+
 matplotlib.use("Agg")  # Non-interactive backend
 
 from rq_vae_explorer.training.state import TrainingState
@@ -37,7 +38,9 @@ def create_app() -> gr.Blocks:
 
     with gr.Blocks(title="RQ-VAE Explorer") as app:
         gr.Markdown("# RQ-VAE Explorer")
-        gr.Markdown("Interactive training visualization for Residual Quantized VAE on MNIST")
+        gr.Markdown(
+            "Interactive training visualization for Residual Quantized VAE on MNIST"
+        )
 
         # Training controls
         with gr.Row():

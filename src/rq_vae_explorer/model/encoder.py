@@ -15,6 +15,7 @@ class Encoder(nn.Module):
     Attributes:
         latent_dim: Dimension of the output latent vector (default 2)
     """
+
     latent_dim: int = 2
 
     @nn.compact

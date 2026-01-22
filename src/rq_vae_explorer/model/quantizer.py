@@ -21,6 +21,7 @@ class ResidualQuantizer(nn.Module):
         num_levels: Number of quantization levels (D)
         latent_dim: Dimension of latent vectors
     """
+
     num_codes: int = 16
     num_levels: int = 2
     latent_dim: int = 2

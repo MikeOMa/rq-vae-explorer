@@ -1,4 +1,3 @@
-import numpy as np
 import threading
 import time
 from rq_vae_explorer.training.state import TrainingState

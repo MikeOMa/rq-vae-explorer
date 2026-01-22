@@ -36,8 +36,12 @@ def test_compute_losses_weights_affect_total():
     z_e = jnp.ones((4, 2))
     z_q = jnp.ones((4, 2)) * 1.1
 
-    losses_low = compute_losses(x, x_recon, z_e, z_q, lambda_commit=0.1, lambda_codebook=0.1)
-    losses_high = compute_losses(x, x_recon, z_e, z_q, lambda_commit=1.0, lambda_codebook=1.0)
+    losses_low = compute_losses(
+        x, x_recon, z_e, z_q, lambda_commit=0.1, lambda_codebook=0.1
+    )
+    losses_high = compute_losses(
+        x, x_recon, z_e, z_q, lambda_commit=1.0, lambda_codebook=1.0
+    )
 
     # Higher weights should give higher total loss
     assert losses_high["total"] > losses_low["total"]

@@ -1,6 +1,4 @@
 from rq_vae_explorer.ui.controls import (
-    create_lambda_sliders,
-    create_training_controls,
     format_health_text,
 )
 

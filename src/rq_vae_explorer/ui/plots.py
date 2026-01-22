@@ -121,7 +121,9 @@ def plot_loss_curves(history: dict[str, list[float]]) -> plt.Figure:
     fig, ax = plt.subplots(figsize=(8, 4))
 
     if not history.get("total"):
-        ax.text(0.5, 0.5, "No data yet", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5, 0.5, "No data yet", ha="center", va="center", transform=ax.transAxes
+        )
         return fig
 
     steps = range(len(history["total"]))
@@ -209,11 +211,13 @@ def get_codebook_health(
         is_dead = assignment_counts[level] < threshold
         num_codes = len(assignment_counts[level])
 
-        health.append({
-            "level": level + 1,
-            "active": int(num_codes - is_dead.sum()),
-            "dead": int(is_dead.sum()),
-            "total": num_codes,
-        })
+        health.append(
+            {
+                "level": level + 1,
+                "active": int(num_codes - is_dead.sum()),
+                "dead": int(is_dead.sum()),
+                "total": num_codes,
+            }
+        )
 
     return health
