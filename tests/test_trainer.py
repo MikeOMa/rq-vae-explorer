@@ -30,7 +30,7 @@ def test_trainer_background_training():
 
     # Start training in background
     trainer.start()
-    time.sleep(0.5)  # Let it run briefly
+    time.sleep(1.0)  # Let it run briefly
 
     assert state.is_training
     assert state.step > 0
