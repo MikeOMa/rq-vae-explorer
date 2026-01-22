@@ -51,6 +51,11 @@ def create_app() -> gr.Blocks:
         with gr.Row():
             with gr.Column(scale=1):
                 codebook_plot = gr.Plot(label="2D Codebook Visualization")
+                mode_dropdown = gr.Dropdown(
+                    choices=["Residuals", "Cumulative"],
+                    value="Residuals",
+                    label="Plot 2 Mode",
+                )
                 health_text = gr.Markdown("**Codebook Health**\nNo data yet")
 
             with gr.Column(scale=1):
@@ -87,10 +92,11 @@ def create_app() -> gr.Blocks:
         def on_lambda_codebook_change(value):
             state.set_lambda_codebook(value)
 
-        def refresh_ui():
+        def refresh_ui(mode: str):
             """Refresh all UI components with current state."""
             codebook = state.get_codebook()
             encoder_outputs, labels = state.get_encoder_outputs()
+            z_q1, z_q = state.get_quantized_outputs()
             recons, inputs = state.get_reconstructions()
             history = state.get_loss_history()
             assignment_counts = state.get_assignment_counts()
@@ -98,7 +104,13 @@ def create_app() -> gr.Blocks:
             # Codebook plot
             if codebook is not None:
                 codebook_fig = plot_codebook_2d(
-                    codebook, encoder_outputs, labels, assignment_counts
+                    codebook,
+                    encoder_outputs,
+                    labels,
+                    assignment_counts,
+                    z_q1=z_q1,
+                    z_q=z_q,
+                    mode=mode,
                 )
             else:
                 codebook_fig = None
@@ -133,6 +145,7 @@ def create_app() -> gr.Blocks:
         timer = gr.Timer(0.5)
         timer.tick(
             refresh_ui,
+            inputs=[mode_dropdown],
             outputs=[step_text, codebook_plot, recon_plot, loss_plot, health_text],
         )
 
