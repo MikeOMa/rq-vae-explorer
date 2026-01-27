@@ -254,7 +254,7 @@ def plot_loss_curves(history: dict[str, list[float]]) -> plt.Figure:
     """Plot loss curves over training.
 
     Args:
-        history: Dict with keys total, recon, commit, codebook
+        history: Dict with keys total, recon, commit, codebook, wasserstein
 
     Returns:
         Matplotlib figure
@@ -273,6 +273,10 @@ def plot_loss_curves(history: dict[str, list[float]]) -> plt.Figure:
     ax.plot(steps, history["recon"], label="Reconstruction", linestyle="--")
     ax.plot(steps, history["commit"], label="Commitment", linestyle="--")
     ax.plot(steps, history["codebook"], label="Codebook", linestyle="--")
+
+    # Only show wasserstein if it has non-zero values
+    if history.get("wasserstein") and any(v > 0 for v in history["wasserstein"]):
+        ax.plot(steps, history["wasserstein"], label="Wasserstein", linestyle="--")
 
     ax.set_xlabel("Step")
     ax.set_ylabel("Loss")

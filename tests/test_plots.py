@@ -82,3 +82,21 @@ def test_get_codebook_health():
     assert health[0]["dead"] == 2
     assert health[1]["active"] == 12
     assert health[1]["dead"] == 4
+
+
+def test_plot_loss_curves_includes_wasserstein():
+    """Loss plot includes wasserstein line when present."""
+    history = {
+        "total": [1.0, 0.9, 0.8],
+        "recon": [0.5, 0.4, 0.3],
+        "commit": [0.2, 0.2, 0.2],
+        "codebook": [0.3, 0.3, 0.3],
+        "wasserstein": [0.1, 0.1, 0.1],
+    }
+
+    fig = plot_loss_curves(history)
+    ax = fig.axes[0]
+
+    # Should have 5 lines (total, recon, commit, codebook, wasserstein)
+    assert len(ax.lines) == 5
+    plt.close(fig)
