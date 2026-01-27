@@ -107,8 +107,8 @@ def test_compute_losses_with_wasserstein():
     assert losses["wasserstein"] >= 0
 
 
-def test_compute_losses_wasserstein_zero_when_disabled():
-    """wasserstein loss is 0 when lambda_wasserstein=0."""
+def test_compute_losses_wasserstein_not_in_total_when_disabled():
+    """wasserstein loss doesn't contribute to total when lambda_wasserstein=0."""
     x = jnp.ones((4, 28, 28, 1)) * 0.5
     x_recon = jnp.ones((4, 28, 28, 1)) * 0.6
     z_e = jnp.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
@@ -116,7 +116,7 @@ def test_compute_losses_wasserstein_zero_when_disabled():
     z_q1 = z_e * 0.5
     codebook = jnp.ones((2, 16, 2)) * 0.5
 
-    losses = compute_losses(
+    losses_disabled = compute_losses(
         x=x,
         x_recon=x_recon,
         z_e=z_e,
@@ -129,4 +129,22 @@ def test_compute_losses_wasserstein_zero_when_disabled():
         sinkhorn_epsilon=0.05,
     )
 
-    assert losses["wasserstein"] == 0.0
+    losses_enabled = compute_losses(
+        x=x,
+        x_recon=x_recon,
+        z_e=z_e,
+        z_q=z_q,
+        codebook=codebook,
+        z_q1=z_q1,
+        lambda_commit=0.25,
+        lambda_codebook=1.0,
+        lambda_wasserstein=0.5,
+        sinkhorn_epsilon=0.05,
+    )
+
+    # Wasserstein is computed but doesn't contribute when lambda=0
+    assert losses_enabled["total"] > losses_disabled["total"]
+    # Component losses should be the same
+    assert jnp.isclose(losses_enabled["recon"], losses_disabled["recon"])
+    assert jnp.isclose(losses_enabled["commit"], losses_disabled["commit"])
+    assert jnp.isclose(losses_enabled["codebook"], losses_disabled["codebook"])

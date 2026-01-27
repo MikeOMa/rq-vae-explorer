@@ -78,6 +78,8 @@ class Trainer:
         batch: jnp.ndarray,
         lambda_commit: float,
         lambda_codebook: float,
+        lambda_wasserstein: float,
+        sinkhorn_epsilon: float,
     ) -> tuple[
         Any, Any, dict, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray
     ]:
@@ -90,8 +92,12 @@ class Trainer:
                 x_recon=x_recon,
                 z_e=aux["z_e"],
                 z_q=aux["z_q"],
+                codebook=aux["codebook"],
+                z_q1=aux["z_q1"],
                 lambda_commit=lambda_commit,
                 lambda_codebook=lambda_codebook,
+                lambda_wasserstein=lambda_wasserstein,
+                sinkhorn_epsilon=sinkhorn_epsilon,
             )
             return losses["total"], (losses, aux, x_recon)
 
@@ -116,7 +122,9 @@ class Trainer:
     def train_step(self) -> None:
         """Execute a single training step."""
         batch_images, batch_labels = next(self.data_iterator)
-        lambda_commit, lambda_codebook = self.state.get_lambdas()
+        lambda_commit, lambda_codebook, lambda_wasserstein, sinkhorn_epsilon = (
+            self.state.get_all_lambdas()
+        )
 
         (
             self.params,
@@ -133,6 +141,8 @@ class Trainer:
             batch_images,
             lambda_commit,
             lambda_codebook,
+            lambda_wasserstein,
+            sinkhorn_epsilon,
         )
 
         # Convert to numpy for state

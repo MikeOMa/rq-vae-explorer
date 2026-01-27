@@ -92,7 +92,9 @@ def compute_losses(
     codebook_loss = jnp.mean((jax.lax.stop_gradient(z_e) - z_q) ** 2)
 
     # Wasserstein loss: optimal transport between encoder outputs and codebook
-    if lambda_wasserstein > 0 and codebook is not None and z_q1 is not None:
+    # Always compute when codebook/z_q1 provided (JAX JIT requires static control flow)
+    # lambda_wasserstein=0 will zero out the contribution to total loss
+    if codebook is not None and z_q1 is not None:
         # Level 1: transport between z_e and codebook[0]
         w_loss_l1 = sinkhorn_loss(z_e, codebook[0], sinkhorn_epsilon)
 
