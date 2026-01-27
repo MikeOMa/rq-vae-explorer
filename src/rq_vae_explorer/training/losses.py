@@ -55,38 +55,61 @@ def compute_losses(
     x_recon: jnp.ndarray,
     z_e: jnp.ndarray,
     z_q: jnp.ndarray,
+    codebook: jnp.ndarray | None = None,
+    z_q1: jnp.ndarray | None = None,
     lambda_commit: float = 0.25,
     lambda_codebook: float = 1.0,
+    lambda_wasserstein: float = 0.0,
+    sinkhorn_epsilon: float = 0.05,
 ) -> dict[str, jnp.ndarray]:
     """Compute all RQ-VAE loss components.
 
-    Loss = recon_loss + λ_commit * commit_loss + λ_codebook * codebook_loss
+    Loss = recon + lambda_commit * commit + lambda_codebook * codebook
+           + lambda_wasserstein * wasserstein
 
     Args:
         x: Original input images (batch, H, W, C)
         x_recon: Reconstructed images (batch, H, W, C)
         z_e: Encoder output before quantization (batch, latent_dim)
         z_q: Quantized latent vectors (batch, latent_dim)
+        codebook: Full codebook (num_levels, num_codes, latent_dim)
+        z_q1: Level 1 quantized output (batch, latent_dim)
         lambda_commit: Weight for commitment loss
         lambda_codebook: Weight for codebook loss
+        lambda_wasserstein: Weight for Wasserstein loss (0 = disabled)
+        sinkhorn_epsilon: Sinkhorn entropy regularization
 
     Returns:
-        Dict with keys: total, recon, commit, codebook
+        Dict with keys: total, recon, commit, codebook, wasserstein
     """
     # Reconstruction loss: MSE between input and reconstruction
     recon_loss = jnp.mean((x - x_recon) ** 2)
 
     # Commitment loss: encourages encoder to commit to codebook vectors
-    # Gradient only flows to encoder (z_q is stopped)
     commit_loss = jnp.mean((z_e - jax.lax.stop_gradient(z_q)) ** 2)
 
     # Codebook loss: moves codebook vectors toward encoder outputs
-    # Gradient only flows to codebook (z_e is stopped)
     codebook_loss = jnp.mean((jax.lax.stop_gradient(z_e) - z_q) ** 2)
+
+    # Wasserstein loss: optimal transport between encoder outputs and codebook
+    if lambda_wasserstein > 0 and codebook is not None and z_q1 is not None:
+        # Level 1: transport between z_e and codebook[0]
+        w_loss_l1 = sinkhorn_loss(z_e, codebook[0], sinkhorn_epsilon)
+
+        # Level 2: transport between residuals and codebook[1]
+        residuals = z_e - z_q1
+        w_loss_l2 = sinkhorn_loss(residuals, codebook[1], sinkhorn_epsilon)
+
+        wasserstein_loss = w_loss_l1 + w_loss_l2
+    else:
+        wasserstein_loss = jnp.array(0.0)
 
     # Total loss
     total_loss = (
-        recon_loss + lambda_commit * commit_loss + lambda_codebook * codebook_loss
+        recon_loss
+        + lambda_commit * commit_loss
+        + lambda_codebook * codebook_loss
+        + lambda_wasserstein * wasserstein_loss
     )
 
     return {
@@ -94,4 +117,5 @@ def compute_losses(
         "recon": recon_loss,
         "commit": commit_loss,
         "codebook": codebook_loss,
+        "wasserstein": wasserstein_loss,
     }
