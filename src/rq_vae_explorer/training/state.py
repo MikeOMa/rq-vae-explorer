@@ -16,6 +16,8 @@ class TrainingState:
     # Loss weights (UI writes, trainer reads)
     _lambda_commit: float = 0.25
     _lambda_codebook: float = 1.0
+    _lambda_wasserstein: float = 0.0
+    _sinkhorn_epsilon: float = 0.05
 
     # Training status
     _step: int = 0
@@ -24,7 +26,13 @@ class TrainingState:
 
     # Metrics (trainer writes, UI reads)
     _loss_history: dict[str, list[float]] = field(
-        default_factory=lambda: {"total": [], "recon": [], "commit": [], "codebook": []}
+        default_factory=lambda: {
+            "total": [],
+            "recon": [],
+            "commit": [],
+            "codebook": [],
+            "wasserstein": [],
+        }
     )
     _codebook: np.ndarray | None = None
     _encoder_outputs: np.ndarray | None = None
@@ -64,6 +72,34 @@ class TrainingState:
         """Get both lambda values atomically."""
         with self._lock:
             return self._lambda_commit, self._lambda_codebook
+
+    @property
+    def lambda_wasserstein(self) -> float:
+        with self._lock:
+            return self._lambda_wasserstein
+
+    @property
+    def sinkhorn_epsilon(self) -> float:
+        with self._lock:
+            return self._sinkhorn_epsilon
+
+    def set_lambda_wasserstein(self, value: float) -> None:
+        with self._lock:
+            self._lambda_wasserstein = value
+
+    def set_sinkhorn_epsilon(self, value: float) -> None:
+        with self._lock:
+            self._sinkhorn_epsilon = value
+
+    def get_all_lambdas(self) -> tuple[float, float, float, float]:
+        """Get all lambda values atomically."""
+        with self._lock:
+            return (
+                self._lambda_commit,
+                self._lambda_codebook,
+                self._lambda_wasserstein,
+                self._sinkhorn_epsilon,
+            )
 
     # --- Training status ---
 
@@ -106,6 +142,7 @@ class TrainingState:
                 "recon": [],
                 "commit": [],
                 "codebook": [],
+                "wasserstein": [],
             }
             self._codebook = None
             self._encoder_outputs = None

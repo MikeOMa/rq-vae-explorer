@@ -76,3 +76,35 @@ def test_state_stores_quantized_outputs():
     assert retrieved_z_q is not None
     np.testing.assert_array_equal(retrieved_z_q1, z_q1)
     np.testing.assert_array_equal(retrieved_z_q, z_q)
+
+
+def test_training_state_wasserstein_params():
+    """State tracks lambda_wasserstein and sinkhorn_epsilon."""
+    state = TrainingState()
+
+    # Default values
+    assert state.lambda_wasserstein == 0.0
+    assert state.sinkhorn_epsilon == 0.05
+
+    # Setters work
+    state.set_lambda_wasserstein(0.5)
+    state.set_sinkhorn_epsilon(0.1)
+
+    assert state.lambda_wasserstein == 0.5
+    assert state.sinkhorn_epsilon == 0.1
+
+
+def test_training_state_get_all_lambdas():
+    """get_all_lambdas returns all four parameters."""
+    state = TrainingState()
+    state.set_lambda_commit(0.3)
+    state.set_lambda_codebook(0.8)
+    state.set_lambda_wasserstein(0.5)
+    state.set_sinkhorn_epsilon(0.1)
+
+    commit, codebook, wasserstein, epsilon = state.get_all_lambdas()
+
+    assert commit == 0.3
+    assert codebook == 0.8
+    assert wasserstein == 0.5
+    assert epsilon == 0.1
