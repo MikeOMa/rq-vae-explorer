@@ -30,6 +30,33 @@ def create_lambda_sliders() -> tuple[gr.Slider, gr.Slider]:
     return lambda_commit, lambda_codebook
 
 
+def create_wasserstein_sliders() -> tuple[gr.Slider, gr.Slider]:
+    """Create sliders for Wasserstein loss parameters.
+
+    Returns:
+        Tuple of (lambda_wasserstein_slider, sinkhorn_epsilon_slider)
+    """
+    lambda_wasserstein = gr.Slider(
+        minimum=0.0,
+        maximum=1.0,
+        value=0.0,
+        step=0.01,
+        label="λ_wasserstein (optimal transport weight)",
+        info="0 = off (traditional VQ), higher = pull all codes toward data",
+    )
+
+    sinkhorn_epsilon = gr.Slider(
+        minimum=0.01,
+        maximum=0.2,
+        value=0.05,
+        step=0.01,
+        label="Sinkhorn ε (transport softness)",
+        info="Lower = sharper transport, higher = softer",
+    )
+
+    return lambda_wasserstein, sinkhorn_epsilon
+
+
 def create_training_controls() -> tuple[gr.Button, gr.Button, gr.Button]:
     """Create training control buttons.
 
