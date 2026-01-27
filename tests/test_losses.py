@@ -50,3 +50,32 @@ def test_compute_losses_weights_affect_total():
     assert jnp.isclose(losses_high["recon"], losses_low["recon"])
     assert jnp.isclose(losses_high["commit"], losses_low["commit"])
     assert jnp.isclose(losses_high["codebook"], losses_low["codebook"])
+
+
+def test_sinkhorn_loss_basic():
+    """Sinkhorn loss computes optimal transport between points and codebook."""
+    from rq_vae_explorer.training.losses import sinkhorn_loss
+
+    # Simple case: 4 points, 4 codebook entries
+    points = jnp.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+    codebook = jnp.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+
+    loss = sinkhorn_loss(points, codebook, epsilon=0.05, num_iters=20)
+
+    # Perfect match should give near-zero loss
+    assert loss >= 0
+    assert loss < 0.1
+
+
+def test_sinkhorn_loss_nonzero_for_mismatch():
+    """Sinkhorn loss is higher when points don't match codebook."""
+    from rq_vae_explorer.training.losses import sinkhorn_loss
+
+    # Use moderate distances that work with epsilon=0.05
+    points = jnp.array([[0.0, 0.0], [0.1, 0.0], [0.0, 0.1], [0.1, 0.1]])
+    codebook = jnp.array([[1.0, 1.0], [1.1, 1.0], [1.0, 1.1], [1.1, 1.1]])
+
+    loss = sinkhorn_loss(points, codebook, epsilon=0.1, num_iters=20)
+
+    # Offset should give positive loss
+    assert loss > 0.5

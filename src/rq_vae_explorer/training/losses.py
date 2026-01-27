@@ -4,6 +4,52 @@ import jax
 import jax.numpy as jnp
 
 
+def sinkhorn_loss(
+    points: jnp.ndarray,
+    codebook: jnp.ndarray,
+    epsilon: float = 0.05,
+    num_iters: int = 20,
+) -> jnp.ndarray:
+    """Compute Sinkhorn (entropy-regularized optimal transport) loss.
+
+    Args:
+        points: Batch of points (batch_size, latent_dim)
+        codebook: Codebook vectors (num_codes, latent_dim)
+        epsilon: Entropy regularization strength (lower = sharper)
+        num_iters: Number of Sinkhorn iterations
+
+    Returns:
+        Scalar Wasserstein distance approximation
+    """
+    batch_size = points.shape[0]
+    num_codes = codebook.shape[0]
+
+    # Cost matrix: squared Euclidean distances (batch_size, num_codes)
+    diff = points[:, None, :] - codebook[None, :, :]  # (batch, codes, dim)
+    C = jnp.sum(diff**2, axis=-1)  # (batch, codes)
+
+    # Kernel matrix
+    K = jnp.exp(-C / epsilon)
+
+    # Uniform marginals
+    a = jnp.ones(batch_size) / batch_size
+    b = jnp.ones(num_codes) / num_codes
+
+    # Sinkhorn iterations
+    u = jnp.ones(batch_size)
+    v = jnp.ones(num_codes)
+
+    for _ in range(num_iters):
+        u = a / (K @ v + 1e-8)
+        v = b / (K.T @ u + 1e-8)
+
+    # Transport plan and cost
+    transport = u[:, None] * K * v[None, :]
+    loss = jnp.sum(transport * C)
+
+    return loss
+
+
 def compute_losses(
     x: jnp.ndarray,
     x_recon: jnp.ndarray,
