@@ -15,6 +15,7 @@ from rq_vae_explorer.ui.plots import (
 )
 from rq_vae_explorer.ui.controls import (
     create_lambda_sliders,
+    create_wasserstein_sliders,
     create_training_controls,
     format_health_text,
     format_step_text,
@@ -65,6 +66,8 @@ def create_app() -> gr.Blocks:
         # Parameter controls
         with gr.Row():
             lambda_commit, lambda_codebook = create_lambda_sliders()
+        with gr.Row():
+            lambda_wasserstein, sinkhorn_epsilon = create_wasserstein_sliders()
 
         # --- Event handlers ---
 
@@ -91,6 +94,12 @@ def create_app() -> gr.Blocks:
 
         def on_lambda_codebook_change(value):
             state.set_lambda_codebook(value)
+
+        def on_lambda_wasserstein_change(value):
+            state.set_lambda_wasserstein(value)
+
+        def on_sinkhorn_epsilon_change(value):
+            state.set_sinkhorn_epsilon(value)
 
         def refresh_ui(mode: str):
             """Refresh all UI components with current state."""
@@ -140,6 +149,10 @@ def create_app() -> gr.Blocks:
 
         lambda_commit.change(on_lambda_commit_change, inputs=[lambda_commit])
         lambda_codebook.change(on_lambda_codebook_change, inputs=[lambda_codebook])
+        lambda_wasserstein.change(
+            on_lambda_wasserstein_change, inputs=[lambda_wasserstein]
+        )
+        sinkhorn_epsilon.change(on_sinkhorn_epsilon_change, inputs=[sinkhorn_epsilon])
 
         # Auto-refresh while app is open
         timer = gr.Timer(0.5)
