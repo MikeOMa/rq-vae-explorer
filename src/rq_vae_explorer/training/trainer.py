@@ -81,7 +81,15 @@ class Trainer:
         lambda_wasserstein: float,
         sinkhorn_epsilon: float,
     ) -> tuple[
-        Any, Any, dict, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray
+        Any,
+        Any,
+        dict,
+        jnp.ndarray,
+        jnp.ndarray,
+        jnp.ndarray,
+        jnp.ndarray,
+        jnp.ndarray,
+        jnp.ndarray,
     ]:
         """Inner training step (JIT compiled)."""
 
@@ -105,6 +113,10 @@ class Trainer:
             loss_fn, has_aux=True
         )(params)
 
+        # Extract codebook gradient norms for debugging
+        codebook_grads = grads["params"]["quantizer"]["codebook"]
+        grad_norms = jnp.linalg.norm(codebook_grads, axis=-1)  # (num_levels, num_codes)
+
         updates, opt_state = self.optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
 
@@ -117,6 +129,7 @@ class Trainer:
             aux["z_e"],
             aux["z_q1"],
             aux["z_q"],
+            grad_norms,
         )
 
     def train_step(self) -> None:
@@ -135,6 +148,7 @@ class Trainer:
             encoder_outputs,
             z_q1,
             z_q,
+            grad_norms,
         ) = self._train_step_jit(
             self.params,
             self.opt_state,
@@ -152,6 +166,7 @@ class Trainer:
         indices_np = np.array(indices)
         z_q1_np = np.array(z_q1)
         z_q_np = np.array(z_q)
+        grad_norms_np = np.array(grad_norms)
 
         # Update assignment tracking
         self._update_assignment_tracking(indices_np)
@@ -168,6 +183,10 @@ class Trainer:
             z_q=z_q_np,
         )
         self.state.add_losses({k: float(v) for k, v in losses.items()})
+
+        # Update debug tracking
+        self.state.update_codebook_history(codebook_np, step)
+        self.state.update_grad_ema(grad_norms_np)
 
         # Update reconstructions periodically
         if step % 50 == 0:
@@ -203,6 +222,34 @@ class Trainer:
             reconstructions=np.array(x_recon),
             sample_inputs=np.array(sample_images[:8]),
         )
+
+        # Also update decoded codebooks
+        self._update_decoded_codebooks()
+
+    def _update_decoded_codebooks(self) -> None:
+        """Decode all L1+L2 codebook combinations."""
+        codebook = self.state.get_codebook()
+        if codebook is None:
+            return
+
+        # Create all combinations of L1[i] + L2[j]
+        l1_codes = codebook[0]  # (num_codes, latent_dim)
+        l2_codes = codebook[1]  # (num_codes, latent_dim)
+
+        combinations = []
+        for i in range(self.num_codes):
+            for j in range(self.num_codes):
+                z = l1_codes[i] + l2_codes[j]
+                combinations.append(z)
+
+        z_combinations = jnp.array(combinations)  # (num_codes^2, latent_dim)
+
+        # Decode through the model's decoder
+        decoded = self.model.apply(
+            self.params, z_combinations, method=self.model.decode
+        )
+
+        self.state.update(decoded_codebooks=np.array(decoded))
 
     def _training_loop(self) -> None:
         """Background training loop."""

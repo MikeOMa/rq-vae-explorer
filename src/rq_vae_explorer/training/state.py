@@ -17,7 +17,7 @@ class TrainingState:
     _lambda_commit: float = 0.25
     _lambda_codebook: float = 1.0
     _lambda_wasserstein: float = 0.0
-    _sinkhorn_epsilon: float = 0.05
+    _sinkhorn_epsilon: float = 0.2
 
     # Training status
     _step: int = 0
@@ -39,11 +39,22 @@ class TrainingState:
     _encoder_labels: np.ndarray | None = None
     _reconstructions: np.ndarray | None = None
     _sample_inputs: np.ndarray | None = None
+    _decoded_codebooks: np.ndarray | None = None
 
     # Assignment tracking for dead codebook detection
     _assignment_counts: np.ndarray | None = None
     _z_q1: np.ndarray | None = None
     _z_q: np.ndarray | None = None
+
+    # Codebook trajectory history for debugging
+    _codebook_history: list[np.ndarray] = field(default_factory=list)
+    _codebook_history_steps: list[int] = field(default_factory=list)
+    _codebook_history_max: int = 200
+    _codebook_history_interval: int = 50
+
+    # Gradient EMA for debugging (smoothed gradient magnitudes per codebook vector)
+    _codebook_grad_ema: np.ndarray | None = None
+    _grad_ema_alpha: float = 0.05
 
     # Thread lock
     _lock: threading.Lock = field(default_factory=threading.Lock)
@@ -149,9 +160,13 @@ class TrainingState:
             self._encoder_labels = None
             self._reconstructions = None
             self._sample_inputs = None
+            self._decoded_codebooks = None
             self._assignment_counts = None
             self._z_q1 = None
             self._z_q = None
+            self._codebook_history = []
+            self._codebook_history_steps = []
+            self._codebook_grad_ema = None
 
     # --- Metrics updates ---
 
@@ -163,6 +178,7 @@ class TrainingState:
         encoder_labels: np.ndarray | None = None,
         reconstructions: np.ndarray | None = None,
         sample_inputs: np.ndarray | None = None,
+        decoded_codebooks: np.ndarray | None = None,
         assignment_counts: np.ndarray | None = None,
         z_q1: np.ndarray | None = None,
         z_q: np.ndarray | None = None,
@@ -181,6 +197,8 @@ class TrainingState:
                 self._reconstructions = reconstructions
             if sample_inputs is not None:
                 self._sample_inputs = sample_inputs
+            if decoded_codebooks is not None:
+                self._decoded_codebooks = decoded_codebooks
             if assignment_counts is not None:
                 self._assignment_counts = assignment_counts
             if z_q1 is not None:
@@ -245,3 +263,51 @@ class TrainingState:
             z_q1 = self._z_q1.copy() if self._z_q1 is not None else None
             z_q = self._z_q.copy() if self._z_q is not None else None
             return z_q1, z_q
+
+    def get_decoded_codebooks(self) -> np.ndarray | None:
+        """Get decoded codebook combination images."""
+        with self._lock:
+            return (
+                self._decoded_codebooks.copy()
+                if self._decoded_codebooks is not None
+                else None
+            )
+
+    # --- Codebook debug tracking ---
+
+    def update_codebook_history(self, codebook: np.ndarray, step: int) -> None:
+        """Record a codebook snapshot for trajectory visualization."""
+        with self._lock:
+            if step % self._codebook_history_interval == 0:
+                self._codebook_history.append(codebook.copy())
+                self._codebook_history_steps.append(step)
+                if len(self._codebook_history) > self._codebook_history_max:
+                    self._codebook_history.pop(0)
+                    self._codebook_history_steps.pop(0)
+
+    def update_grad_ema(self, grad_norms: np.ndarray) -> None:
+        """Update exponential moving average of gradient magnitudes."""
+        with self._lock:
+            if self._codebook_grad_ema is None:
+                self._codebook_grad_ema = grad_norms.copy()
+            else:
+                self._codebook_grad_ema = (
+                    1 - self._grad_ema_alpha
+                ) * self._codebook_grad_ema + self._grad_ema_alpha * grad_norms
+
+    def get_codebook_history(self) -> tuple[list[np.ndarray], list[int]]:
+        """Get codebook trajectory history."""
+        with self._lock:
+            return (
+                [cb.copy() for cb in self._codebook_history],
+                list(self._codebook_history_steps),
+            )
+
+    def get_codebook_grad_ema(self) -> np.ndarray | None:
+        """Get smoothed gradient magnitudes."""
+        with self._lock:
+            return (
+                self._codebook_grad_ema.copy()
+                if self._codebook_grad_ema is not None
+                else None
+            )

@@ -12,6 +12,9 @@ from rq_vae_explorer.ui.plots import (
     plot_loss_curves,
     plot_reconstructions,
     get_codebook_health,
+    plot_codebook_trajectory,
+    plot_gradient_magnitudes,
+    plot_decoded_codebooks,
 )
 from rq_vae_explorer.ui.controls import (
     create_lambda_sliders,
@@ -33,7 +36,7 @@ def create_app() -> gr.Blocks:
     trainer = Trainer(
         state=state,
         latent_dim=2,
-        num_codes=16,
+        num_codes=4,
         num_levels=2,
     )
 
@@ -69,6 +72,15 @@ def create_app() -> gr.Blocks:
         with gr.Row():
             lambda_wasserstein, sinkhorn_epsilon = create_wasserstein_sliders()
 
+        # Debug visualizations (collapsible)
+        with gr.Accordion("Debug: Codebook Dynamics", open=False):
+            with gr.Row():
+                trajectory_plot_l1 = gr.Plot(label="L1 Codebook Trajectory")
+                trajectory_plot_l2 = gr.Plot(label="L2 Codebook Trajectory")
+            with gr.Row():
+                gradient_plot = gr.Plot(label="Gradient Magnitudes")
+                decoded_codebooks_plot = gr.Plot(label="Decoded Codebook Combinations")
+
         # --- Event handlers ---
 
         def on_start():
@@ -87,6 +99,10 @@ def create_app() -> gr.Blocks:
                 None,  # recon_plot
                 None,  # loss_plot
                 "**Codebook Health**\nNo data yet",
+                None,  # trajectory_plot_l1
+                None,  # trajectory_plot_l2
+                None,  # gradient_plot
+                None,  # decoded_codebooks_plot
             )
 
         def on_lambda_commit_change(value):
@@ -103,12 +119,18 @@ def create_app() -> gr.Blocks:
 
         def refresh_ui(mode: str):
             """Refresh all UI components with current state."""
+            import matplotlib.pyplot as plt
+
+            plt.close("all")  # Prevent memory leak from accumulating figures
+
             codebook = state.get_codebook()
             encoder_outputs, labels = state.get_encoder_outputs()
             z_q1, z_q = state.get_quantized_outputs()
             recons, inputs = state.get_reconstructions()
             history = state.get_loss_history()
             assignment_counts = state.get_assignment_counts()
+            codebook_history, history_steps = state.get_codebook_history()
+            grad_ema = state.get_codebook_grad_ema()
 
             # Codebook plot
             if codebook is not None:
@@ -137,14 +159,45 @@ def create_app() -> gr.Blocks:
             # Step text
             step_str = format_step_text(state.step, state.is_training)
 
-            return step_str, codebook_fig, recon_fig, loss_fig, health_str
+            # Debug plots
+            trajectory_fig_l1 = plot_codebook_trajectory(
+                codebook_history, history_steps, assignment_counts, level=0
+            )
+            trajectory_fig_l2 = plot_codebook_trajectory(
+                codebook_history, history_steps, assignment_counts, level=1
+            )
+            gradient_fig = plot_gradient_magnitudes(grad_ema, assignment_counts)
+            decoded_codebooks = state.get_decoded_codebooks()
+            decoded_fig = plot_decoded_codebooks(decoded_codebooks, num_codes=4)
+
+            return (
+                step_str,
+                codebook_fig,
+                recon_fig,
+                loss_fig,
+                health_str,
+                trajectory_fig_l1,
+                trajectory_fig_l2,
+                gradient_fig,
+                decoded_fig,
+            )
 
         # Wire up event handlers
         start_btn.click(on_start, outputs=[step_text])
         stop_btn.click(on_stop, outputs=[step_text])
         reset_btn.click(
             on_reset,
-            outputs=[step_text, codebook_plot, recon_plot, loss_plot, health_text],
+            outputs=[
+                step_text,
+                codebook_plot,
+                recon_plot,
+                loss_plot,
+                health_text,
+                trajectory_plot_l1,
+                trajectory_plot_l2,
+                gradient_plot,
+                decoded_codebooks_plot,
+            ],
         )
 
         lambda_commit.change(on_lambda_commit_change, inputs=[lambda_commit])
@@ -159,7 +212,17 @@ def create_app() -> gr.Blocks:
         timer.tick(
             refresh_ui,
             inputs=[mode_dropdown],
-            outputs=[step_text, codebook_plot, recon_plot, loss_plot, health_text],
+            outputs=[
+                step_text,
+                codebook_plot,
+                recon_plot,
+                loss_plot,
+                health_text,
+                trajectory_plot_l1,
+                trajectory_plot_l2,
+                gradient_plot,
+                decoded_codebooks_plot,
+            ],
         )
 
     return app

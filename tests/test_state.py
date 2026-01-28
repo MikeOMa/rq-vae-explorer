@@ -84,7 +84,7 @@ def test_training_state_wasserstein_params():
 
     # Default values
     assert state.lambda_wasserstein == 0.0
-    assert state.sinkhorn_epsilon == 0.05
+    assert state.sinkhorn_epsilon == 0.2
 
     # Setters work
     state.set_lambda_wasserstein(0.5)

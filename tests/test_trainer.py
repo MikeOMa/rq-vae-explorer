@@ -30,7 +30,7 @@ def test_trainer_background_training():
 
     # Start training in background
     trainer.start()
-    time.sleep(2.0)  # Let it run briefly (JIT compilation takes time)
+    time.sleep(3.0)  # Let it run briefly (JIT compilation takes time)
 
     assert state.is_training
     assert state.step > 0

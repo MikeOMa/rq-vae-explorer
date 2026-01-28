@@ -47,11 +47,11 @@ def create_wasserstein_sliders() -> tuple[gr.Slider, gr.Slider]:
 
     sinkhorn_epsilon = gr.Slider(
         minimum=0.01,
-        maximum=0.2,
-        value=0.05,
+        maximum=1.0,
+        value=0.2,
         step=0.01,
         label="Sinkhorn ε (transport softness)",
-        info="Lower = sharper transport, higher = softer",
+        info="Lower = sharper transport, higher = softer (needs ~0.2+ for distant codes)",
     )
 
     return lambda_wasserstein, sinkhorn_epsilon

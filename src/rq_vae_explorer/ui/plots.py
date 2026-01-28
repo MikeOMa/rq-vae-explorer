@@ -366,3 +366,220 @@ def get_codebook_health(
         )
 
     return health
+
+
+# Colors for individual codebook vectors (4 codes)
+CODEBOOK_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
+
+
+def plot_codebook_trajectory(
+    history: list[np.ndarray],
+    steps: list[int],
+    assignment_counts: np.ndarray | None = None,
+    threshold_pct: float = 0.01,
+    level: int = 0,
+) -> plt.Figure:
+    """Plot trajectory of codebook vectors over training.
+
+    Args:
+        history: List of codebook snapshots (num_levels, num_codes, 2)
+        steps: Step numbers corresponding to each snapshot
+        assignment_counts: Current assignment counts (num_levels, num_codes)
+        threshold_pct: Threshold for dead codebook detection
+        level: Which level to plot (0 = L1, 1 = L2)
+
+    Returns:
+        Matplotlib figure
+    """
+    fig, ax = plt.subplots(figsize=(6, 5))
+    level_name = f"L{level + 1}"
+
+    if not history or len(history) < 2:
+        ax.text(
+            0.5,
+            0.5,
+            "Not enough data yet",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        ax.set_title(f"{level_name} Codebook Trajectory")
+        return fig
+
+    num_codes = history[0].shape[1]
+
+    # Determine dead codebooks from current assignment counts
+    if assignment_counts is not None and level < assignment_counts.shape[0]:
+        total_assignments = assignment_counts[level].sum()
+        threshold = threshold_pct * total_assignments
+        is_dead = assignment_counts[level] < threshold
+    else:
+        is_dead = np.zeros(num_codes, dtype=bool)
+
+    # Plot trajectory for each codebook vector at the specified level
+    for code_idx in range(num_codes):
+        positions = np.array([h[level, code_idx] for h in history])
+        color = CODEBOOK_COLORS[code_idx % len(CODEBOOK_COLORS)]
+        linestyle = "--" if is_dead[code_idx] else "-"
+        alpha = 0.5 if is_dead[code_idx] else 0.8
+
+        # Draw trajectory line
+        ax.plot(
+            positions[:, 0],
+            positions[:, 1],
+            color=color,
+            linestyle=linestyle,
+            alpha=alpha,
+            linewidth=2,
+            label=f"Code {code_idx}" + (" (dead)" if is_dead[code_idx] else ""),
+        )
+
+        # Mark start (small circle)
+        ax.scatter(
+            positions[0, 0],
+            positions[0, 1],
+            color=color,
+            s=30,
+            marker="o",
+            alpha=alpha,
+            zorder=5,
+        )
+
+        # Mark end (large marker)
+        ax.scatter(
+            positions[-1, 0],
+            positions[-1, 1],
+            color=color,
+            s=100,
+            marker="s",
+            edgecolors="white",
+            linewidths=1.5,
+            alpha=1.0,
+            zorder=10,
+        )
+
+    step_range = f"Steps {steps[0]}-{steps[-1]}" if steps else ""
+    ax.set_title(f"{level_name} Codebook Trajectory ({step_range})")
+    ax.set_xlabel("Latent dim 1")
+    ax.set_ylabel("Latent dim 2")
+    ax.legend(loc="upper right", fontsize=8)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    return fig
+
+
+def plot_decoded_codebooks(
+    decoded_images: np.ndarray | None,
+    num_codes: int = 4,
+) -> plt.Figure:
+    """Plot decoded codebook combinations as a grid.
+
+    Args:
+        decoded_images: Decoded images (num_l1 * num_l2, 28, 28, 1)
+        num_codes: Number of codes per level
+
+    Returns:
+        Matplotlib figure
+    """
+    fig, axes = plt.subplots(num_codes, num_codes, figsize=(6, 6))
+
+    if decoded_images is None:
+        for ax in axes.flat:
+            ax.axis("off")
+        axes[0, 0].text(
+            0.5,
+            0.5,
+            "No data yet",
+            ha="center",
+            va="center",
+            transform=axes[0, 0].transAxes,
+        )
+        fig.suptitle("Decoded Codebook Combinations")
+        return fig
+
+    for i in range(num_codes):
+        for j in range(num_codes):
+            idx = i * num_codes + j
+            ax = axes[i, j]
+            if idx < len(decoded_images):
+                ax.imshow(decoded_images[idx, :, :, 0], cmap="gray", vmin=0, vmax=1)
+            ax.axis("off")
+            if i == 0:
+                ax.set_title(f"L2-{j}", fontsize=9)
+            if j == 0:
+                ax.set_ylabel(f"L1-{i}", fontsize=9)
+                ax.yaxis.set_visible(True)
+                ax.set_yticks([])
+
+    fig.suptitle("Decoded: L1[row] + L2[col]", fontsize=11)
+    plt.tight_layout()
+    return fig
+
+
+def plot_gradient_magnitudes(
+    grad_ema: np.ndarray | None,
+    assignment_counts: np.ndarray | None = None,
+    threshold_pct: float = 0.01,
+) -> plt.Figure:
+    """Plot smoothed gradient magnitudes per codebook vector.
+
+    Args:
+        grad_ema: Smoothed gradient norms (num_levels, num_codes)
+        assignment_counts: Assignment counts (num_levels, num_codes)
+        threshold_pct: Threshold for dead codebook detection
+
+    Returns:
+        Matplotlib figure
+    """
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    if grad_ema is None:
+        ax.text(
+            0.5,
+            0.5,
+            "No gradient data yet",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        ax.set_title("Gradient Magnitudes (EMA)")
+        return fig
+
+    num_levels, num_codes = grad_ema.shape
+
+    # Determine dead codebooks
+    if assignment_counts is not None:
+        is_dead = np.zeros_like(grad_ema, dtype=bool)
+        for level in range(num_levels):
+            total = assignment_counts[level].sum()
+            threshold = threshold_pct * total if total > 0 else 0
+            is_dead[level] = assignment_counts[level] < threshold
+    else:
+        is_dead = np.zeros_like(grad_ema, dtype=bool)
+
+    # Create bar chart
+    labels = []
+    values = []
+    colors = []
+
+    for level in range(num_levels):
+        for code_idx in range(num_codes):
+            labels.append(f"L{level + 1}-{code_idx}")
+            values.append(grad_ema[level, code_idx])
+            if is_dead[level, code_idx]:
+                colors.append("gray")
+            else:
+                colors.append(CODEBOOK_COLORS[code_idx % len(CODEBOOK_COLORS)])
+
+    x = np.arange(len(labels))
+    ax.bar(x, values, color=colors, edgecolor="white", linewidth=0.5)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=9)
+    ax.set_ylabel("Gradient Norm (EMA)")
+    ax.set_title("Gradient Magnitudes (gray = dead)")
+    ax.grid(True, alpha=0.3, axis="y")
+
+    plt.tight_layout()
+    return fig

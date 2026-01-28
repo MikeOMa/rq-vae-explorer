@@ -28,4 +28,4 @@ def test_create_wasserstein_sliders():
     lambda_w, epsilon = create_wasserstein_sliders()
 
     assert lambda_w.value == 0.0
-    assert epsilon.value == 0.05
+    assert epsilon.value == 0.2
