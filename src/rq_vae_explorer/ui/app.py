@@ -40,9 +40,14 @@ def create_app() -> gr.Blocks:
         num_levels=2,
     )
 
-    # Cache for debug plots (to avoid regenerating every tick)
-    debug_plot_cache = {
-        "last_step": -1,
+    # Cache for plots (to avoid regenerating every tick)
+    plot_cache = {
+        "main_last_step": -1,
+        "codebook": None,
+        "recon": None,
+        "loss": None,
+        "health": "**Codebook Health**\nNo data yet",
+        "debug_last_step": -1,
         "trajectory_l1": None,
         "trajectory_l2": None,
         "gradient": None,
@@ -80,6 +85,15 @@ def create_app() -> gr.Blocks:
             lambda_commit, lambda_codebook = create_lambda_sliders()
         with gr.Row():
             lambda_wasserstein, sinkhorn_epsilon = create_wasserstein_sliders()
+        with gr.Row():
+            main_refresh_interval = gr.Slider(
+                minimum=10,
+                maximum=500,
+                value=50,
+                step=10,
+                label="Main Plot Refresh Interval (steps)",
+                info="How often to update main visualizations",
+            )
 
         # Debug visualizations (collapsible)
         with gr.Accordion("Debug: Codebook Dynamics", open=False):
@@ -111,12 +125,17 @@ def create_app() -> gr.Blocks:
 
         def on_reset():
             trainer.reset()
-            # Reset debug plot cache
-            debug_plot_cache["last_step"] = -1
-            debug_plot_cache["trajectory_l1"] = None
-            debug_plot_cache["trajectory_l2"] = None
-            debug_plot_cache["gradient"] = None
-            debug_plot_cache["decoded"] = None
+            # Reset plot cache
+            plot_cache["main_last_step"] = -1
+            plot_cache["codebook"] = None
+            plot_cache["recon"] = None
+            plot_cache["loss"] = None
+            plot_cache["health"] = "**Codebook Health**\nNo data yet"
+            plot_cache["debug_last_step"] = -1
+            plot_cache["trajectory_l1"] = None
+            plot_cache["trajectory_l2"] = None
+            plot_cache["gradient"] = None
+            plot_cache["decoded"] = None
             return (
                 format_step_text(0, False),
                 None,  # codebook_plot
@@ -141,81 +160,77 @@ def create_app() -> gr.Blocks:
         def on_sinkhorn_epsilon_change(value):
             state.set_sinkhorn_epsilon(value)
 
-        def refresh_ui(mode: str, refresh_interval: int):
+        def refresh_ui(mode: str, main_interval: int, debug_interval: int):
             """Refresh all UI components with current state."""
             import matplotlib.pyplot as plt
 
             plt.close("all")  # Prevent memory leak from accumulating figures
 
             current_step = state.step
-            codebook = state.get_codebook()
-            encoder_outputs, labels = state.get_encoder_outputs()
-            z_q1, z_q = state.get_quantized_outputs()
-            recons, inputs = state.get_reconstructions()
-            history = state.get_loss_history()
-            assignment_counts = state.get_assignment_counts()
 
-            # Codebook plot (always update - it's the main visualization)
-            if codebook is not None:
-                codebook_fig = plot_codebook_2d(
-                    codebook,
-                    encoder_outputs,
-                    labels,
-                    assignment_counts,
-                    z_q1=z_q1,
-                    z_q=z_q,
-                    mode=mode,
-                )
-            else:
-                codebook_fig = None
-
-            # Reconstruction plot
-            recon_fig = plot_reconstructions(inputs, recons)
-
-            # Loss plot
-            loss_fig = plot_loss_curves(history)
-
-            # Health text
-            health = get_codebook_health(assignment_counts)
-            health_str = format_health_text(health)
-
-            # Step text
+            # Step text always updates
             step_str = format_step_text(current_step, state.is_training)
 
+            # Main plots - only update every N steps
+            main_steps_since = current_step - plot_cache["main_last_step"]
+            if main_steps_since >= main_interval or plot_cache["main_last_step"] < 0:
+                codebook = state.get_codebook()
+                encoder_outputs, labels = state.get_encoder_outputs()
+                z_q1, z_q = state.get_quantized_outputs()
+                recons, inputs = state.get_reconstructions()
+                history = state.get_loss_history()
+                assignment_counts = state.get_assignment_counts()
+
+                if codebook is not None:
+                    plot_cache["codebook"] = plot_codebook_2d(
+                        codebook,
+                        encoder_outputs,
+                        labels,
+                        assignment_counts,
+                        z_q1=z_q1,
+                        z_q=z_q,
+                        mode=mode,
+                    )
+
+                plot_cache["recon"] = plot_reconstructions(inputs, recons)
+                plot_cache["loss"] = plot_loss_curves(history)
+
+                health = get_codebook_health(assignment_counts)
+                plot_cache["health"] = format_health_text(health)
+                plot_cache["main_last_step"] = current_step
+
             # Debug plots - only update every N steps
-            steps_since_last = current_step - debug_plot_cache["last_step"]
-            if (
-                steps_since_last >= refresh_interval
-                or debug_plot_cache["last_step"] < 0
-            ):
+            debug_steps_since = current_step - plot_cache["debug_last_step"]
+            if debug_steps_since >= debug_interval or plot_cache["debug_last_step"] < 0:
                 codebook_history, history_steps = state.get_codebook_history()
                 grad_ema = state.get_codebook_grad_ema()
                 decoded_codebooks = state.get_decoded_codebooks()
+                assignment_counts = state.get_assignment_counts()
 
-                debug_plot_cache["trajectory_l1"] = plot_codebook_trajectory(
+                plot_cache["trajectory_l1"] = plot_codebook_trajectory(
                     codebook_history, history_steps, assignment_counts, level=0
                 )
-                debug_plot_cache["trajectory_l2"] = plot_codebook_trajectory(
+                plot_cache["trajectory_l2"] = plot_codebook_trajectory(
                     codebook_history, history_steps, assignment_counts, level=1
                 )
-                debug_plot_cache["gradient"] = plot_gradient_magnitudes(
+                plot_cache["gradient"] = plot_gradient_magnitudes(
                     grad_ema, assignment_counts
                 )
-                debug_plot_cache["decoded"] = plot_decoded_codebooks(
+                plot_cache["decoded"] = plot_decoded_codebooks(
                     decoded_codebooks, num_codes=4
                 )
-                debug_plot_cache["last_step"] = current_step
+                plot_cache["debug_last_step"] = current_step
 
             return (
                 step_str,
-                codebook_fig,
-                recon_fig,
-                loss_fig,
-                health_str,
-                debug_plot_cache["trajectory_l1"],
-                debug_plot_cache["trajectory_l2"],
-                debug_plot_cache["gradient"],
-                debug_plot_cache["decoded"],
+                plot_cache["codebook"],
+                plot_cache["recon"],
+                plot_cache["loss"],
+                plot_cache["health"],
+                plot_cache["trajectory_l1"],
+                plot_cache["trajectory_l2"],
+                plot_cache["gradient"],
+                plot_cache["decoded"],
             )
 
         # Wire up event handlers
@@ -247,7 +262,7 @@ def create_app() -> gr.Blocks:
         timer = gr.Timer(0.5)
         timer.tick(
             refresh_ui,
-            inputs=[mode_dropdown, debug_refresh_interval],
+            inputs=[mode_dropdown, main_refresh_interval, debug_refresh_interval],
             outputs=[
                 step_text,
                 codebook_plot,
