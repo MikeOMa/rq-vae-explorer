@@ -11,6 +11,7 @@ import optax
 from rq_vae_explorer.model import RQVAE
 from rq_vae_explorer.data import load_mnist, create_data_iterator
 from rq_vae_explorer.training.losses import compute_losses
+from rq_vae_explorer.training.mlflow_tracker import MLflowTracker
 from rq_vae_explorer.training.state import TrainingState
 
 
@@ -29,11 +30,15 @@ class Trainer:
         num_levels: int = 2,
         learning_rate: float = 1e-3,
         batch_size: int = 64,
+        mlflow_tracker: MLflowTracker | None = None,
     ):
         self.state = state
         self.batch_size = batch_size
         self.num_codes = num_codes
         self.num_levels = num_levels
+        self.learning_rate = learning_rate
+        self.latent_dim = latent_dim
+        self.mlflow_tracker = mlflow_tracker or MLflowTracker()
 
         # Initialize model
         self.model = RQVAE(
@@ -182,7 +187,18 @@ class Trainer:
             z_q1=z_q1_np,
             z_q=z_q_np,
         )
-        self.state.add_losses({k: float(v) for k, v in losses.items()})
+        losses_float = {k: float(v) for k, v in losses.items()}
+        self.state.add_losses(losses_float)
+
+        # Log to MLflow
+        mlflow_metrics = {f"loss_{k}": v for k, v in losses_float.items()}
+        mlflow_metrics.update({
+            "lambda_commit": lambda_commit,
+            "lambda_codebook": lambda_codebook,
+            "lambda_wasserstein": lambda_wasserstein,
+            "sinkhorn_epsilon": sinkhorn_epsilon,
+        })
+        self.mlflow_tracker.log_metrics(mlflow_metrics, step=step)
 
         # Update debug tracking
         self.state.update_codebook_history(codebook_np, step)
@@ -254,11 +270,19 @@ class Trainer:
     def _training_loop(self) -> None:
         """Background training loop."""
         self.state.start_training()
+        self.mlflow_tracker.start_run({
+            "latent_dim": self.latent_dim,
+            "num_codes": self.num_codes,
+            "num_levels": self.num_levels,
+            "learning_rate": self.learning_rate,
+            "batch_size": self.batch_size,
+        })
 
         try:
             while not self.state.should_stop:
                 self.train_step()
         finally:
+            self.mlflow_tracker.end_run()
             self.state.training_stopped()
 
     def start(self) -> None:

@@ -12,6 +12,7 @@ dependencies = [
     "gradio",
     "matplotlib",
     "numpy",
+    "mlflow",
 ]
 
 [project.optional-dependencies]

@@ -5,6 +5,7 @@ import matplotlib
 
 matplotlib.use("Agg")  # Non-interactive backend
 
+from rq_vae_explorer.training.mlflow_tracker import MLflowTracker
 from rq_vae_explorer.training.state import TrainingState
 from rq_vae_explorer.training.trainer import Trainer
 from rq_vae_explorer.ui.plots import (
@@ -33,11 +34,13 @@ def create_app() -> gr.Blocks:
     """
     # Shared state and trainer (created once)
     state = TrainingState()
+    mlflow_tracker = MLflowTracker()
     trainer = Trainer(
         state=state,
         latent_dim=2,
         num_codes=4,
         num_levels=2,
+        mlflow_tracker=mlflow_tracker,
     )
 
     # Cache for plots (to avoid regenerating every tick)
@@ -95,6 +98,29 @@ def create_app() -> gr.Blocks:
                 info="How often to update main visualizations",
             )
 
+        # MLflow tracking controls
+        with gr.Accordion("MLflow Tracking", open=False):
+            with gr.Row():
+                mlflow_enabled = gr.Checkbox(
+                    label="Enable MLflow Tracking",
+                    value=False,
+                    info="Log metrics and hyperparameters to MLflow",
+                )
+                mlflow_experiment = gr.Textbox(
+                    label="Experiment Name",
+                    value="rq-vae-explorer",
+                    placeholder="rq-vae-explorer",
+                )
+                mlflow_log_interval = gr.Slider(
+                    minimum=1,
+                    maximum=100,
+                    value=10,
+                    step=1,
+                    label="Log Interval (steps)",
+                    info="How often to log metrics",
+                )
+            mlflow_status = gr.Markdown("**MLflow:** Disabled")
+
         # Debug visualizations (collapsible)
         with gr.Accordion("Debug: Codebook Dynamics", open=False):
             with gr.Row():
@@ -115,7 +141,10 @@ def create_app() -> gr.Blocks:
 
         # --- Event handlers ---
 
-        def on_start():
+        def on_start(enabled, experiment, log_interval):
+            mlflow_tracker.enabled = enabled
+            mlflow_tracker.experiment_name = experiment
+            mlflow_tracker.log_interval = int(log_interval)
             trainer.start()
             return format_step_text(state.step, True)
 
@@ -159,6 +188,15 @@ def create_app() -> gr.Blocks:
 
         def on_sinkhorn_epsilon_change(value):
             state.set_sinkhorn_epsilon(value)
+
+        def _format_mlflow_status() -> str:
+            run_id = mlflow_tracker.run_id
+            if not mlflow_tracker.enabled:
+                return "**MLflow:** Disabled"
+            if run_id is None:
+                return "**MLflow:** Enabled — no active run"
+            uri = mlflow_tracker.tracking_uri or "mlruns"
+            return f"**MLflow:** Run `{run_id[:8]}...` — tracking URI: `{uri}`"
 
         def refresh_ui(mode: str, main_interval: int, debug_interval: int):
             """Refresh all UI components with current state."""
@@ -227,6 +265,7 @@ def create_app() -> gr.Blocks:
                 plot_cache["recon"],
                 plot_cache["loss"],
                 plot_cache["health"],
+                _format_mlflow_status(),
                 plot_cache["trajectory_l1"],
                 plot_cache["trajectory_l2"],
                 plot_cache["gradient"],
@@ -234,7 +273,11 @@ def create_app() -> gr.Blocks:
             )
 
         # Wire up event handlers
-        start_btn.click(on_start, outputs=[step_text])
+        start_btn.click(
+            on_start,
+            inputs=[mlflow_enabled, mlflow_experiment, mlflow_log_interval],
+            outputs=[step_text],
+        )
         stop_btn.click(on_stop, outputs=[step_text])
         reset_btn.click(
             on_reset,
@@ -269,6 +312,7 @@ def create_app() -> gr.Blocks:
                 recon_plot,
                 loss_plot,
                 health_text,
+                mlflow_status,
                 trajectory_plot_l1,
                 trajectory_plot_l2,
                 gradient_plot,
