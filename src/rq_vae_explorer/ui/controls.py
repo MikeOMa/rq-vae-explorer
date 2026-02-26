@@ -63,10 +63,9 @@ def create_training_controls() -> tuple[gr.Button, gr.Button, gr.Button]:
     Returns:
         Tuple of (start_btn, stop_btn, reset_btn)
     """
-    with gr.Row():
-        start_btn = gr.Button("▶ Start Training", variant="primary")
-        stop_btn = gr.Button("⏹ Stop")
-        reset_btn = gr.Button("↺ Reset")
+    start_btn = gr.Button("▶ Start Training", variant="primary")
+    stop_btn = gr.Button("⏹ Stop")
+    reset_btn = gr.Button("↺ Reset")
 
     return start_btn, stop_btn, reset_btn
 
@@ -81,7 +80,7 @@ def format_health_text(health: list[dict[str, int]]) -> str:
         Formatted text string
     """
     if not health:
-        return "No data yet"
+        return "**Codebook Health**\nNo data yet"
 
     lines = ["**Codebook Health**"]
     for h in health:

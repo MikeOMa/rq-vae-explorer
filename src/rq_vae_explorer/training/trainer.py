@@ -1,7 +1,10 @@
 """Training loop for RQ-VAE."""
 
+import logging
 import threading
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import jax
 import jax.numpy as jnp
@@ -76,10 +79,10 @@ class Trainer:
         params: Any,
         opt_state: Any,
         batch: jnp.ndarray,
-        lambda_commit: float,
-        lambda_codebook: float,
-        lambda_wasserstein: float,
-        sinkhorn_epsilon: float,
+        lambda_commit: jnp.ndarray,
+        lambda_codebook: jnp.ndarray,
+        lambda_wasserstein: jnp.ndarray,
+        sinkhorn_epsilon: jnp.ndarray,
     ) -> tuple[
         Any,
         Any,
@@ -153,10 +156,10 @@ class Trainer:
             self.params,
             self.opt_state,
             batch_images,
-            lambda_commit,
-            lambda_codebook,
-            lambda_wasserstein,
-            sinkhorn_epsilon,
+            jnp.array(lambda_commit),
+            jnp.array(lambda_codebook),
+            jnp.array(lambda_wasserstein),
+            jnp.array(sinkhorn_epsilon),
         )
 
         # Convert to numpy for state
@@ -258,6 +261,8 @@ class Trainer:
         try:
             while not self.state.should_stop:
                 self.train_step()
+        except Exception:
+            logger.exception("Training loop encountered an error and stopped")
         finally:
             self.state.training_stopped()
 
