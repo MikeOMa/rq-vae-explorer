@@ -9,7 +9,8 @@ dependencies = [
     "optax",
     "tensorflow-datasets",
     "tensorflow",
-    "gradio",
+    "fastapi",
+    "uvicorn[standard]",
     "matplotlib",
     "numpy",
 ]

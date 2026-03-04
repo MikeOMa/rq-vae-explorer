@@ -1,5 +1,5 @@
-"""Gradio UI components."""
+"""Rust-backed UI components - FastAPI server + egui native frontend."""
 
-from .app import main, create_app
+from .app import main
 
-__all__ = ["main", "create_app"]
+__all__ = ["main"]

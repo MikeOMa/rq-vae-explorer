@@ -1,6 +1,4 @@
-from rq_vae_explorer.ui.controls import (
-    format_health_text,
-)
+from rq_vae_explorer.ui.controls import format_health_text
 
 
 def test_format_health_text_empty():
@@ -19,13 +17,3 @@ def test_format_health_text_with_data():
     assert "14/16" in result
     assert "Level 2" in result
     assert "12/16" in result
-
-
-def test_create_wasserstein_sliders():
-    """Wasserstein sliders are created with correct defaults."""
-    from rq_vae_explorer.ui.controls import create_wasserstein_sliders
-
-    lambda_w, epsilon = create_wasserstein_sliders()
-
-    assert lambda_w.value == 0.0
-    assert epsilon.value == 0.2
